@@ -21,27 +21,44 @@ import time
 import threading
 
 # Import MediaPipe with error handling and verification
+# MediaPipe 0.10.30 uses a different API structure
 try:
     import mediapipe as mp
     print(f"MediaPipe imported, version: {mp.__version__ if hasattr(mp, '__version__') else 'unknown'}")
-    print(f"MediaPipe attributes: {dir(mp)[:10]}")  # Debug: show first 10 attributes
     
-    # Verify MediaPipe is properly imported
-    if not hasattr(mp, 'solutions'):
-        # Try alternative import method
+    # Try to import solutions - MediaPipe 0.10+ may have it in a different location
+    try:
+        # Try the standard import first
+        from mediapipe.python.solutions import face_mesh as mp_face_mesh_module
+        from mediapipe.python.solutions import drawing_utils as mp_drawing_module
+        mp_face_mesh = mp_face_mesh_module
+        mp_drawing = mp_drawing_module
+        print("MediaPipe solutions imported from mediapipe.python.solutions")
+    except ImportError:
         try:
+            # Try alternative path for older/newer versions
             from mediapipe import solutions
             mp.solutions = solutions
-            print("MediaPipe solutions imported via alternative method")
-        except ImportError:
-            raise ImportError(
-                f"MediaPipe solutions module not found. "
-                f"MediaPipe may not be installed correctly. "
-                f"Available attributes: {[attr for attr in dir(mp) if not attr.startswith('_')]}"
-            )
+            mp_face_mesh = mp.solutions.face_mesh
+            mp_drawing = mp.solutions.drawing_utils
+            print("MediaPipe solutions imported via standard method")
+        except (ImportError, AttributeError):
+            try:
+                # Try direct import from solutions submodule
+                import mediapipe.solutions.face_mesh as mp_face_mesh_module
+                import mediapipe.solutions.drawing_utils as mp_drawing_module
+                mp_face_mesh = mp_face_mesh_module
+                mp_drawing = mp_drawing_module
+                print("MediaPipe solutions imported directly")
+            except ImportError:
+                # Last resort: try to use tasks API (newer MediaPipe)
+                raise ImportError(
+                    f"MediaPipe solutions module not found. "
+                    f"MediaPipe version {getattr(mp, '__version__', 'unknown')} may not support the solutions API. "
+                    f"Available attributes: {[attr for attr in dir(mp) if not attr.startswith('_')]}. "
+                    f"Try downgrading to mediapipe==0.10.9 or earlier."
+                )
     
-    mp_face_mesh = mp.solutions.face_mesh
-    mp_drawing = mp.solutions.drawing_utils
     print("MediaPipe imported successfully")
 except (ImportError, AttributeError) as e:
     print(f"ERROR: Failed to import MediaPipe: {e}")
