@@ -1,0 +1,18 @@
+# Optimized requirements for Render.com deployment
+# Note: TensorFlow is heavy - if you encounter memory issues, try removing it
+# MediaPipe face mesh works without TensorFlow, but some features may require it
+
+flask>=3.0.0
+flask-socketio>=5.3.0
+mediapipe>=0.10.0
+opencv-python-headless>=4.8.0  # Use headless version (no GUI dependencies) for server
+numpy>=1.24.0
+Pillow>=10.0.0
+python-socketio>=5.10.0
+gevent>=23.0.0
+gevent-websocket>=0.10.1
+
+# Optional: TensorFlow (heavy dependency, ~500MB)
+# Uncomment if needed, but may cause memory issues on free tier
+# tensorflow>=2.13.0
+

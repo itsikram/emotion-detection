@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediaPipe Face Expression Detection</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            background: #000;
+        }
+
+        #video {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .emotion-display {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .emotion-label {
+            font-size: 18px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .emotion-value {
+            font-size: 48px;
+            font-weight: bold;
+            text-transform: capitalize;
+            margin-bottom: 10px;
+        }
+
+        .confidence {
+            font-size: 16px;
+            opacity: 0.8;
+        }
+
+        .detections-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .detection-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            border-left: 4px solid #667eea;
+        }
+
+        .detection-card.active {
+            background: #e7f3ff;
+            border-left-color: #28a745;
+        }
+
+        .detection-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+            text-transform: capitalize;
+        }
+
+        .detection-value {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .emotions-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .emotion-chip {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .emotion-chip.high {
+            background: rgba(255, 255, 255, 0.4);
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-start {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-start:hover {
+            background: #218838;
+        }
+
+        .btn-stop {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-stop:hover {
+            background: #c82333;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .info p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎭 Face Expression Detection</h1>
+        <p class="subtitle">Powered by MediaPipe & Python</p>
+
+        <div id="status" class="status disconnected">Disconnected</div>
+
+        <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+        </div>
+
+        <div class="emotion-display">
+            <div class="emotion-label">Dominant Emotion</div>
+            <div id="emotion-value" class="emotion-value">Waiting...</div>
+            <div id="confidence" class="confidence">No face detected</div>
+            <div id="emotions-list" class="emotions-list"></div>
+        </div>
+
+        <div class="emotion-display" style="margin-top: 20px;">
+            <div class="emotion-label">Dominant Action</div>
+            <div id="expression-value" class="emotion-value">Waiting...</div>
+            <div id="expression-confidence" class="confidence">No action detected</div>
+            <div id="expressions-list" class="emotions-list"></div>
+        </div>
+
+        <div class="detections-grid">
+            <div class="detection-card" id="yawning-card">
+                <div class="detection-title">Yawning</div>
+                <div class="detection-value" id="yawning-value">-</div>
+            </div>
+            <div class="detection-card" id="blinking-card">
+                <div class="detection-title">Eye Blinking</div>
+                <div class="detection-value" id="blinking-value">-</div>
+            </div>
+            <div class="detection-card" id="smile-card">
+                <div class="detection-title">Smile Intensity</div>
+                <div class="detection-value" id="smile-value">-</div>
+            </div>
+            <div class="detection-card" id="headshake-card">
+                <div class="detection-title">Head Shake</div>
+                <div class="detection-value" id="headshake-value">-</div>
+            </div>
+            <div class="detection-card" id="attention-card">
+                <div class="detection-title">Attention</div>
+                <div class="detection-value" id="attention-value">-</div>
+            </div>
+            <div class="detection-card" id="crying-card">
+                <div class="detection-title">Crying</div>
+                <div class="detection-value" id="crying-value">-</div>
+            </div>
+            <div class="detection-card" id="silent-crying-card">
+                <div class="detection-title">Silent Crying</div>
+                <div class="detection-value" id="silent-crying-value">-</div>
+            </div>
+            <div class="detection-card" id="kissing-card">
+                <div class="detection-title">Kissing</div>
+                <div class="detection-value" id="kissing-value">-</div>
+            </div>
+            <div class="detection-card" id="speaking-card">
+                <div class="detection-title">Speaking</div>
+                <div class="detection-value" id="speaking-value">-</div>
+            </div>
+            <div class="detection-card" id="laughing-card">
+                <div class="detection-title">Laughing</div>
+                <div class="detection-value" id="laughing-value">-</div>
+            </div>
+            <div class="detection-card" id="sleepy-card">
+                <div class="detection-title">Sleepy</div>
+                <div class="detection-value" id="sleepy-value">-</div>
+            </div>
+            <div class="detection-card" id="eating-card">
+                <div class="detection-title">Eating</div>
+                <div class="detection-value" id="eating-value">-</div>
+            </div>
+            <div class="detection-card" id="drinking-card">
+                <div class="detection-title">Drinking</div>
+                <div class="detection-value" id="drinking-value">-</div>
+            </div>
+            <div class="detection-card" id="eyebrow-raised-card">
+                <div class="detection-title">Eyebrow Raised</div>
+                <div class="detection-value" id="eyebrow-raised-value">-</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="startBtn" class="btn-start" onclick="startDetection()">Start Camera</button>
+            <button id="stopBtn" class="btn-stop" onclick="stopDetection()" disabled>Stop Camera</button>
+        </div>
+
+        <div class="info">
+            <p><strong>Instructions:</strong></p>
+            <p>1. Click "Start Camera" to begin face detection</p>
+            <p>2. Allow browser access to your webcam</p>
+            <p>3. Your expressions will be detected in real-time</p>
+            <p>4. Detects: Happy, Sad, Angry, Surprise, Fear, Disgust, Neutral</p>
+            <p>5. Also detects: Yawning, Eye Blinking, Smile Intensity, Head Shake, Attention, Crying, Silent Crying, Kissing, Speaking, Laughing, Sleepy, Eating, Drinking, Eyebrow Raised</p>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let stream = null;
+        let captureInterval = null;
+        let isRequestInFlight = false; // Prevent sending multiple frames simultaneously
+        const video = document.getElementById('video');
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const statusDiv = document.getElementById('status');
+        const emotionValue = document.getElementById('emotion-value');
+        const confidenceDiv = document.getElementById('confidence');
+
+        // Socket connection events
+        socket.on('connect', () => {
+            statusDiv.textContent = 'Connected to Server';
+            statusDiv.className = 'status connected';
+        });
+
+        socket.on('disconnect', () => {
+            statusDiv.textContent = 'Disconnected from Server';
+            statusDiv.className = 'status disconnected';
+            emotionValue.textContent = 'Disconnected';
+            confidenceDiv.textContent = 'Please reconnect';
+        });
+
+        socket.on('face_emotion', (data) => {
+            // Mark request as complete when response received
+            isRequestInFlight = false;
+            
+            if (data.success) {
+                // Display dominant emotion
+                const dominant = data.dominant_emotion || 'neutral';
+                emotionValue.textContent = dominant;
+                
+                // Display confidence
+                if (data.emotions && data.emotions.confidence) {
+                    const confPercent = (data.emotions.confidence * 100).toFixed(0);
+                    confidenceDiv.textContent = `Confidence: ${confPercent}%`;
+                } else {
+                    confidenceDiv.textContent = 'Detecting...';
+                }
+                
+                // Display all emotions
+                if (data.emotions && data.emotions.all) {
+                    const emotionsList = document.getElementById('emotions-list');
+                    emotionsList.innerHTML = '';
+                    Object.entries(data.emotions.all).forEach(([emotion, score]) => {
+                        const chip = document.createElement('div');
+                        chip.className = 'emotion-chip' + (score > 0.3 ? ' high' : '');
+                        chip.textContent = `${emotion}: ${(score * 100).toFixed(0)}%`;
+                        emotionsList.appendChild(chip);
+                    });
+                }
+                
+                // Display dominant expression/action
+                const expressionValue = document.getElementById('expression-value');
+                const expressionConfidence = document.getElementById('expression-confidence');
+                const expressionsList = document.getElementById('expressions-list');
+                
+                if (data.dominant_expression && data.dominant_expression !== 'none') {
+                    expressionValue.textContent = data.dominant_expression.charAt(0).toUpperCase() + data.dominant_expression.slice(1);
+                    
+                    if (data.dominant_expression_data) {
+                        const exprScore = data.dominant_expression_data.score || 0;
+                        const exprIntensity = data.dominant_expression_data.intensity || 0;
+                        const scorePercent = (exprScore * 100).toFixed(0);
+                        const intensityPercent = (exprIntensity * 100).toFixed(0);
+                        expressionConfidence.textContent = `Intensity: ${intensityPercent}% | Score: ${scorePercent}%`;
+                    } else {
+                        expressionConfidence.textContent = 'Detecting...';
+                    }
+                    
+                    // Display all detected expressions with scores
+                    if (data.dominant_expression_data && data.dominant_expression_data.all_expressions) {
+                        expressionsList.innerHTML = '';
+                        Object.entries(data.dominant_expression_data.all_expressions)
+                            .sort((a, b) => b[1].score - a[1].score)  // Sort by score descending
+                            .forEach(([key, exprData]) => {
+                                const chip = document.createElement('div');
+                                chip.className = 'emotion-chip' + (exprData.score > 0.3 ? ' high' : '');
+                                chip.textContent = `${exprData.name}: ${(exprData.intensity * 100).toFixed(0)}%`;
+                                expressionsList.appendChild(chip);
+                            });
+                    } else {
+                        expressionsList.innerHTML = '';
+                    }
+                } else {
+                    expressionValue.textContent = 'None';
+                    expressionConfidence.textContent = 'No active action detected';
+                    expressionsList.innerHTML = '';
+                }
+                
+                // Update expression cards
+                updateCard('yawning-card', 'yawning-value', data.expressions?.yawning, data.features?.yawning_intensity);
+                updateCard('blinking-card', 'blinking-value', data.expressions?.eye_blinking, data.features?.blink_count);
+                updateCard('smile-card', 'smile-value', null, data.features?.smile_intensity, true);
+                updateCard('headshake-card', 'headshake-value', data.expressions?.head_shake, data.features?.head_shake_intensity);
+                updateCard('attention-card', 'attention-value', data.expressions?.attention, data.features?.attention_score, true);
+                updateCard('crying-card', 'crying-value', data.expressions?.crying, data.features?.crying_intensity);
+                updateCard('silent-crying-card', 'silent-crying-value', data.expressions?.silent_crying, data.features?.silent_crying_intensity);
+                updateCard('kissing-card', 'kissing-value', data.expressions?.kissing, data.features?.kissing_intensity);
+                updateCard('speaking-card', 'speaking-value', data.expressions?.speaking, data.features?.speaking_intensity, true);
+                updateCard('laughing-card', 'laughing-value', data.expressions?.laughing, data.features?.laughing_intensity, true);
+                updateCard('sleepy-card', 'sleepy-value', data.expressions?.sleepy, data.features?.sleepy_intensity, true);
+                updateCard('eating-card', 'eating-value', data.expressions?.eating, data.features?.eating_intensity, true);
+                updateCard('drinking-card', 'drinking-value', data.expressions?.drinking, data.features?.drinking_intensity, true);
+                updateCard('eyebrow-raised-card', 'eyebrow-raised-value', data.expressions?.eyebrow_raised, data.features?.eyebrow_raised_intensity, true);
+                
+            } else {
+                emotionValue.textContent = 'No Face';
+                confidenceDiv.textContent = data.message || 'Please position your face in front of the camera';
+                document.getElementById('emotions-list').innerHTML = '';
+                document.getElementById('expression-value').textContent = 'None';
+                document.getElementById('expression-confidence').textContent = 'No face detected';
+                document.getElementById('expressions-list').innerHTML = '';
+                resetAllCards();
+            }
+        });
+
+        function updateCard(cardId, valueId, isActive, intensity, isFeature = false) {
+            const card = document.getElementById(cardId);
+            const valueEl = document.getElementById(valueId);
+            
+            if (isFeature !== false) {
+                // It's a feature (intensity/score), always show value
+                if (intensity !== undefined && intensity !== null) {
+                    if (typeof intensity === 'number') {
+                        valueEl.textContent = (intensity * 100).toFixed(0) + '%';
+                        card.classList.add('active');
+                    } else {
+                        valueEl.textContent = intensity;
+                        card.classList.add('active');
+                    }
+                } else {
+                    valueEl.textContent = '-';
+                    card.classList.remove('active');
+                }
+            } else {
+                // It's a boolean expression
+                if (isActive) {
+                    valueEl.textContent = 'Yes';
+                    card.classList.add('active');
+                    if (intensity !== undefined) {
+                        valueEl.textContent += ` (${(intensity * 100).toFixed(0)}%)`;
+                    }
+                } else {
+                    valueEl.textContent = 'No';
+                    card.classList.remove('active');
+                }
+            }
+        }
+
+        function resetAllCards() {
+            const cards = ['yawning-card', 'blinking-card', 'smile-card', 'headshake-card', 'attention-card', 'crying-card', 'silent-crying-card', 'kissing-card', 'speaking-card', 'laughing-card', 'sleepy-card', 'eating-card', 'drinking-card', 'eyebrow-raised-card'];
+            const values = ['yawning-value', 'blinking-value', 'smile-value', 'headshake-value', 'attention-value', 'crying-value', 'silent-crying-value', 'kissing-value', 'speaking-value', 'laughing-value', 'sleepy-value', 'eating-value', 'drinking-value', 'eyebrow-raised-value'];
+            cards.forEach(cardId => document.getElementById(cardId).classList.remove('active'));
+            values.forEach(valueId => document.getElementById(valueId).textContent = '-');
+        }
+
+        socket.on('response', (data) => {
+            console.log('Server response:', data);
+        });
+
+        async function startDetection() {
+            try {
+                // Request webcam access
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'user'
+                    }
+                });
+
+                video.srcObject = stream;
+                video.play();
+
+                // Start capturing frames - optimized interval to prevent payload errors
+                captureInterval = setInterval(() => {
+                    captureFrame();
+                }, 500); // Capture every 500ms (~2 FPS) - reduced frequency to prevent "too many packets" error
+
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                emotionValue.textContent = 'Initializing...';
+                confidenceDiv.textContent = 'Starting detection';
+            } catch (error) {
+                console.error('Error accessing webcam:', error);
+                alert('Failed to access webcam. Please allow camera permissions.');
+            }
+        }
+
+        function stopDetection() {
+            // Stop capturing frames
+            if (captureInterval) {
+                clearInterval(captureInterval);
+                captureInterval = null;
+            }
+
+            // Stop video stream
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+                video.srcObject = null;
+            }
+
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            emotionValue.textContent = 'Stopped';
+            confidenceDiv.textContent = 'Camera stopped';
+        }
+
+        function captureFrame() {
+            // Prevent sending if a request is already in flight
+            if (isRequestInFlight || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+                return;
+            }
+
+            try {
+                isRequestInFlight = true;
+                
+                // Create canvas and draw video frame
+                const canvas = document.createElement('canvas');
+                // Optimize: reduce resolution for faster processing and smaller payload
+                const maxWidth = 640;
+                const maxHeight = 480;
+                const aspectRatio = video.videoWidth / video.videoHeight;
+                
+                let width = video.videoWidth;
+                let height = video.videoHeight;
+                
+                if (width > maxWidth) {
+                    width = maxWidth;
+                    height = width / aspectRatio;
+                }
+                if (height > maxHeight) {
+                    height = maxHeight;
+                    width = height * aspectRatio;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, width, height);
+
+                // Convert to base64 JPEG with lower quality for smaller payload
+                const imageData = canvas.toDataURL('image/jpeg', 0.75); // Reduced from 0.85
+
+                // Send to server via socket
+                socket.emit('webcam_frame', { frame: imageData });
+                
+                // Reset flag after a short delay to allow response processing
+                setTimeout(() => {
+                    isRequestInFlight = false;
+                }, 200);
+            } catch (error) {
+                console.error('Error capturing frame:', error);
+                isRequestInFlight = false;
+            }
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopDetection();
+            socket.disconnect();
+        });
+    </script>
+</body>
+</html>
+

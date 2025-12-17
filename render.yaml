@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: mediapipe-emotion-detection
+    env: python
+    plan: free
+    region: oregon
+    rootDir: mediapipe
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: python Main.py
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: PORT
+        value: 10000
+      - key: TF_CPP_MIN_LOG_LEVEL
+        value: "2"
+      - key: GLOG_minloglevel
+        value: "2"
+
