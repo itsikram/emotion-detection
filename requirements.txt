@@ -1,8 +1,8 @@
 flask>=3.0.0
 flask-socketio>=5.3.0
-mediapipe>=0.10.0
+mediapipe==0.10.9
 opencv-python>=4.8.0
-numpy>=1.24.0
+numpy>=1.24.0,<2.0.0
 Pillow>=10.0.0
 python-socketio>=5.10.0
 tensorflow>=2.13.0
@@ -11,4 +11,5 @@ gevent-websocket>=0.10.1
 gunicorn>=21.2.0
 eventlet>=0.33.0
 python-engineio>=4.7.0
+protobuf>=3.20.0,<5.0.0
 
