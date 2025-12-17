@@ -24,14 +24,19 @@ import threading
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
 
-# Try to use gevent for better WebSocket support, fallback to threading
+# Try to use eventlet first (for gunicorn), then gevent, then threading
 try:
-    import gevent
-    async_mode = 'gevent'
-    print("Using gevent async mode for WebSocket support")
+    import eventlet
+    async_mode = 'eventlet'
+    print("Using eventlet async mode for WebSocket support")
 except ImportError:
-    async_mode = 'threading'
-    print("Using threading async mode (gevent not available)")
+    try:
+        import gevent
+        async_mode = 'gevent'
+        print("Using gevent async mode for WebSocket support")
+    except ImportError:
+        async_mode = 'threading'
+        print("Using threading async mode (eventlet/gevent not available)")
 
 # Configure Socket.IO with proper async mode and error handling
 socketio = SocketIO(
