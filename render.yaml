@@ -11,6 +11,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: PYTHONUNBUFFERED
+        value: "1"
       - key: PORT
         value: 10000
       - key: TF_CPP_MIN_LOG_LEVEL
