@@ -12,7 +12,6 @@ os.environ['GLOG_minloglevel'] = '2'  # Suppress MediaPipe/Google Logging (GLOG)
 import cv2
 import numpy as np
 import base64
-import mediapipe as mp
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
 from io import BytesIO
@@ -20,6 +19,37 @@ from PIL import Image
 from collections import deque
 import time
 import threading
+
+# Import MediaPipe with error handling and verification
+try:
+    import mediapipe as mp
+    print(f"MediaPipe imported, version: {mp.__version__ if hasattr(mp, '__version__') else 'unknown'}")
+    print(f"MediaPipe attributes: {dir(mp)[:10]}")  # Debug: show first 10 attributes
+    
+    # Verify MediaPipe is properly imported
+    if not hasattr(mp, 'solutions'):
+        # Try alternative import method
+        try:
+            from mediapipe import solutions
+            mp.solutions = solutions
+            print("MediaPipe solutions imported via alternative method")
+        except ImportError:
+            raise ImportError(
+                f"MediaPipe solutions module not found. "
+                f"MediaPipe may not be installed correctly. "
+                f"Available attributes: {[attr for attr in dir(mp) if not attr.startswith('_')]}"
+            )
+    
+    mp_face_mesh = mp.solutions.face_mesh
+    mp_drawing = mp.solutions.drawing_utils
+    print("MediaPipe imported successfully")
+except (ImportError, AttributeError) as e:
+    print(f"ERROR: Failed to import MediaPipe: {e}")
+    print(f"Error type: {type(e).__name__}")
+    import traceback
+    traceback.print_exc()
+    print("Please check build logs to verify MediaPipe installation")
+    raise
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
@@ -51,11 +81,6 @@ socketio = SocketIO(
     allow_upgrades=True,
     transports=['websocket', 'polling']
 )
-
-# Initialize MediaPipe Face Mesh for additional features
-# Use static_image_mode=True since we're processing individual frames from browser
-mp_face_mesh = mp.solutions.face_mesh
-mp_drawing = mp.solutions.drawing_utils
 
 # Thread-local storage for MediaPipe face_mesh instances
 # This prevents cross-contamination between concurrent sessions
