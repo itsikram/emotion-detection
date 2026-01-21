@@ -46,3 +46,10 @@ After using an older version:
 - `mp.solutions.face_mesh` works correctly
 - Service starts successfully
 
+
+
+
+
+
+
+

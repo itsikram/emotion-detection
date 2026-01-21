@@ -41,3 +41,10 @@ MediaPipe 0.10.30 is the latest available version and should work fine with:
 - Python 3.10.12 (alternative)
 - All the other dependencies in requirements.txt
 
+
+
+
+
+
+
+

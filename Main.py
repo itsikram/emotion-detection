@@ -12,78 +12,30 @@ os.environ['GLOG_minloglevel'] = '2'  # Suppress MediaPipe/Google Logging (GLOG)
 import cv2
 import numpy as np
 import base64
+import mediapipe as mp
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit
+from flask_cors import CORS
 from io import BytesIO
 from PIL import Image
 from collections import deque
 import time
 import threading
 
-# Import MediaPipe with error handling and verification
-# MediaPipe 0.10.30 uses a different API structure
-try:
-    import mediapipe as mp
-    print(f"MediaPipe imported, version: {mp.__version__ if hasattr(mp, '__version__') else 'unknown'}")
-    
-    # Try to import solutions - MediaPipe 0.10+ may have it in a different location
-    try:
-        # Try the standard import first
-        from mediapipe.python.solutions import face_mesh as mp_face_mesh_module
-        from mediapipe.python.solutions import drawing_utils as mp_drawing_module
-        mp_face_mesh = mp_face_mesh_module
-        mp_drawing = mp_drawing_module
-        print("MediaPipe solutions imported from mediapipe.python.solutions")
-    except ImportError:
-        try:
-            # Try alternative path for older/newer versions
-            from mediapipe import solutions
-            mp.solutions = solutions
-            mp_face_mesh = mp.solutions.face_mesh
-            mp_drawing = mp.solutions.drawing_utils
-            print("MediaPipe solutions imported via standard method")
-        except (ImportError, AttributeError):
-            try:
-                # Try direct import from solutions submodule
-                import mediapipe.solutions.face_mesh as mp_face_mesh_module
-                import mediapipe.solutions.drawing_utils as mp_drawing_module
-                mp_face_mesh = mp_face_mesh_module
-                mp_drawing = mp_drawing_module
-                print("MediaPipe solutions imported directly")
-            except ImportError:
-                # Last resort: try to use tasks API (newer MediaPipe)
-                raise ImportError(
-                    f"MediaPipe solutions module not found. "
-                    f"MediaPipe version {getattr(mp, '__version__', 'unknown')} may not support the solutions API. "
-                    f"Available attributes: {[attr for attr in dir(mp) if not attr.startswith('_')]}. "
-                    f"Try downgrading to mediapipe==0.10.9 or earlier."
-                )
-    
-    print("MediaPipe imported successfully")
-except (ImportError, AttributeError) as e:
-    print(f"ERROR: Failed to import MediaPipe: {e}")
-    print(f"Error type: {type(e).__name__}")
-    import traceback
-    traceback.print_exc()
-    print("Please check build logs to verify MediaPipe installation")
-    raise
-
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
 
-# Try to use eventlet first (for gunicorn), then gevent, then threading
+# Enable CORS for all origins on Flask app
+CORS(app, origins="*")
+
+# Try to use gevent for better WebSocket support, fallback to threading
 try:
-    import eventlet
-    async_mode = 'eventlet'
-    print("Using eventlet async mode for WebSocket support")
+    import gevent
+    async_mode = 'gevent'
+    print("Using gevent async mode for WebSocket support")
 except ImportError:
-    try:
-        import gevent
-        async_mode = 'gevent'
-        print("Using gevent async mode for WebSocket support")
-    except ImportError:
-        async_mode = 'threading'
-        print("Using threading async mode (eventlet/gevent not available)")
+    async_mode = 'threading'
+    print("Using threading async mode (gevent not available)")
 
 # Configure Socket.IO with proper async mode and error handling
 socketio = SocketIO(
@@ -98,6 +50,11 @@ socketio = SocketIO(
     allow_upgrades=True,
     transports=['websocket', 'polling']
 )
+
+# Initialize MediaPipe Face Mesh for additional features
+# Use static_image_mode=True since we're processing individual frames from browser
+mp_face_mesh = mp.solutions.face_mesh
+mp_drawing = mp.solutions.drawing_utils
 
 # Thread-local storage for MediaPipe face_mesh instances
 # This prevents cross-contamination between concurrent sessions
@@ -2435,19 +2392,16 @@ def handle_frame(data):
             print(f"Failed to emit error response: {emit_err}")
 
 if __name__ == '__main__':
-    # Get port from environment variable (Render.com provides this)
-    port = int(os.environ.get('PORT', 5000))
-    
     print("Starting Comprehensive Emotion & Expression Detection Server...")
     print("Using MediaPipe for full emotion & expression detection")
-    print(f"Access the web interface at: http://0.0.0.0:{port}")
+    print("Access the web interface at: http://localhost:5000")
     print(f"Using async mode: {async_mode}")
     if async_mode == 'threading':
         print("Note: For better WebSocket support, install gevent: pip install gevent gevent-websocket")
     # Run with allow_unsafe_werkzeug to avoid write() before start_response errors
     # Use_reloader=False to avoid issues with debugging
     try:
-        socketio.run(app, host='0.0.0.0', port=port, debug=False, allow_unsafe_werkzeug=True, use_reloader=False)
+        socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True, use_reloader=False)
     except KeyboardInterrupt:
         print("\nShutting down server...")
         try:

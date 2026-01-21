@@ -65,3 +65,10 @@ Make sure these files exist in your `mediapipe` directory:
 3. **Try Python 3.10** - Change PYTHON_VERSION to 3.10.0 (more stable)
 4. **Verify Root Directory** - Make sure it's set to `mediapipe` not root
 
+
+
+
+
+
+
+

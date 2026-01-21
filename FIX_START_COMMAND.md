@@ -98,3 +98,10 @@ Render sometimes doesn't automatically detect `render.yaml` or `Procfile` if:
 
 **Solution:** Always manually set the start command in dashboard to ensure it's used.
 
+
+
+
+
+
+
+

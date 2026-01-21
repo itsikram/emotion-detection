@@ -67,3 +67,10 @@ The TensorFlow warnings in the logs might indicate a conflict. Try:
 4. Check logs for MediaPipe installation status
 5. If still failing, try Solution 4 or 5
 
+
+
+
+
+
+
+
