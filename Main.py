@@ -26,7 +26,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
 
 # Enable CORS for all origins on Flask app
-CORS(app, origins="*")
+CORS(app, origins="*", resources={r"/*": {"origins": "*"}})
 
 # Try to use gevent for better WebSocket support, fallback to threading
 try:
@@ -48,7 +48,8 @@ socketio = SocketIO(
     ping_interval=25,
     max_http_buffer_size=10 * 1024 * 1024,  # 10MB max payload (default is 1MB) - for large base64 images
     allow_upgrades=True,
-    transports=['websocket', 'polling']
+    transports=['websocket', 'polling'],
+    socketio_path='socket.io'  # Explicitly set socket.io path
 )
 
 # Initialize MediaPipe Face Mesh for additional features
@@ -2192,6 +2193,11 @@ def index():
     """Serve the test page"""
     return render_template('index.html')
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Render"""
+    return {'status': 'healthy', 'service': 'emotion-detection'}, 200
+
 @app.errorhandler(500)
 def handle_500(error):
     """Handle 500 errors gracefully"""
@@ -2217,8 +2223,11 @@ def handle_connect():
     try:
         session_id = request.sid
         print(f'Client connected: {session_id}')
+        print(f'Connection details - Transport: {request.environ.get("HTTP_UPGRADE", "unknown")}')
+        print(f'Origin: {request.environ.get("HTTP_ORIGIN", "unknown")}')
         # Session state will be created automatically on first use
         emit('response', {'status': 'connected', 'message': 'Connected to comprehensive emotion detection server'})
+        print(f'Sent response to client: {session_id}')
     except Exception as e:
         print(f'Error in handle_connect: {e}')
         import traceback
@@ -2396,11 +2405,13 @@ if __name__ == '__main__':
     print("Using MediaPipe for full emotion & expression detection")
     print("Access the web interface at: http://localhost:5000")
     print(f"Using async mode: {async_mode}")
+    print(f"Socket.IO configured with transports: websocket, polling")
     if async_mode == 'threading':
         print("Note: For better WebSocket support, install gevent: pip install gevent gevent-websocket")
     # Run with allow_unsafe_werkzeug to avoid write() before start_response errors
     # Use_reloader=False to avoid issues with debugging
     try:
+        print("Starting Flask-SocketIO server...")
         socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True, use_reloader=False)
     except KeyboardInterrupt:
         print("\nShutting down server...")
@@ -2408,3 +2419,8 @@ if __name__ == '__main__':
             socketio.stop()
         except:
             pass
+else:
+    # When running under gunicorn (production)
+    print("Flask app loaded under gunicorn with eventlet workers")
+    print(f"Socket.IO async mode: {async_mode}")
+    print("WebSocket support should be available")
