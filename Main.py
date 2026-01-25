@@ -2275,8 +2275,9 @@ def handle_frame(data):
         # This ensures session state is always initialized and isolated per session
         session_id = request.sid
         
-        # Validate session_id exists
-        if not session_id:
+        # Validate session_id exists and is valid
+        if not session_id or not isinstance(session_id, str):
+            print(f"Invalid session ID received: {session_id}")
             emit('face_emotion', {
                 'emotion': 'error',
                 'error': 'Invalid session ID',
@@ -2285,7 +2286,16 @@ def handle_frame(data):
             return
         
         # Get or create isolated session state for this specific client
-        session_state = get_session_state(session_id)
+        try:
+            session_state = get_session_state(session_id)
+        except Exception as e:
+            print(f"Error creating session state for {session_id}: {e}")
+            emit('face_emotion', {
+                'emotion': 'error',
+                'error': 'Session creation failed',
+                'success': False
+            })
+            return
         
         # Extract base64 image
         image_data = data.get('frame') or data
