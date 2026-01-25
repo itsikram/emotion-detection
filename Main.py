@@ -26,21 +26,22 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
 
 # Enable CORS for all origins on Flask app
-CORS(app, origins="*", resources={r"/*": {"origins": "*"}})
+CORS(app, origins=["*", "https://connect-zfgx.onrender.com", "https://emotion-detection-z1b2.onrender.com"], resources={r"/*": {"origins": "*"}})
 
-# Try to use gevent for better WebSocket support, fallback to threading
+# Use eventlet for WebSocket support (required for Render deployment)
 try:
-    import gevent
-    async_mode = 'gevent'
-    print("Using gevent async mode for WebSocket support")
+    import eventlet
+    eventlet.monkey_patch()
+    async_mode = 'eventlet'
+    print("Using eventlet async mode for WebSocket support")
 except ImportError:
     async_mode = 'threading'
-    print("Using threading async mode (gevent not available)")
+    print("Using threading async mode (eventlet not available)")
 
 # Configure Socket.IO with proper async mode and error handling
 socketio = SocketIO(
     app, 
-    cors_allowed_origins="*",
+    cors_allowed_origins=["*", "https://connect-zfgx.onrender.com", "https://emotion-detection-z1b2.onrender.com"],
     async_mode=async_mode,
     logger=False,  # Reduce logging noise
     engineio_logger=False,  # Reduce engineio logging noise
@@ -51,6 +52,16 @@ socketio = SocketIO(
     transports=['websocket', 'polling'],
     socketio_path='socket.io'  # Explicitly set socket.io path
 )
+
+# Add additional CORS middleware for WebSocket connections
+@app.after_request
+def after_request(response):
+    """Add CORS headers to all responses"""
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
 
 # Initialize MediaPipe Face Mesh for additional features
 # Use static_image_mode=True since we're processing individual frames from browser
@@ -2225,8 +2236,18 @@ def handle_connect():
         print(f'Client connected: {session_id}')
         print(f'Connection details - Transport: {request.environ.get("HTTP_UPGRADE", "unknown")}')
         print(f'Origin: {request.environ.get("HTTP_ORIGIN", "unknown")}')
-        # Session state will be created automatically on first use
-        emit('response', {'status': 'connected', 'message': 'Connected to comprehensive emotion detection server'})
+        print(f'Referer: {request.environ.get("HTTP_REFERER", "unknown")}')
+        print(f'User-Agent: {request.environ.get("HTTP_USER_AGENT", "unknown")}')
+        
+        # Initialize session state
+        get_session_state(session_id)
+        
+        # Send connection response with CORS headers
+        emit('response', {
+            'status': 'connected', 
+            'message': 'Connected to comprehensive emotion detection server',
+            'session_id': session_id
+        })
         print(f'Sent response to client: {session_id}')
     except Exception as e:
         print(f'Error in handle_connect: {e}')
@@ -2406,8 +2427,9 @@ if __name__ == '__main__':
     print("Access the web interface at: http://localhost:5000")
     print(f"Using async mode: {async_mode}")
     print(f"Socket.IO configured with transports: websocket, polling")
+    print(f"CORS allowed origins: *, https://connect-zfgx.onrender.com, https://emotion-detection-z1b2.onrender.com")
     if async_mode == 'threading':
-        print("Note: For better WebSocket support, install gevent: pip install gevent gevent-websocket")
+        print("Note: For better WebSocket support, install eventlet: pip install eventlet")
     # Run with allow_unsafe_werkzeug to avoid write() before start_response errors
     # Use_reloader=False to avoid issues with debugging
     try:
